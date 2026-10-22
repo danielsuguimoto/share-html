@@ -1,0 +1,18 @@
+{
+  "name": "share-html",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-21",
+  "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "PAGES_BUCKET",
+      "bucket_name": "share-html-pages"
+    }
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "OAUTH_KV",
+      "id": "27109c719b904da48bce15b514867990"
+    }
+  ]
+}
