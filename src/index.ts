@@ -1,10 +1,11 @@
-import OAuthProvider, { AuthorizationError } from "@cloudflare/workers-oauth-provider";
-import type { AuthRequest, OAuthHelpers } from "@cloudflare/workers-oauth-provider";
+import { AuthorizationError, CimdFetchError } from "@cloudflare/workers-oauth-provider";
+import type { AuthRequest, OAuthHelpers, OAuthProviderOptions } from "@cloudflare/workers-oauth-provider";
 import { Hono } from "hono";
 import { admin } from "./admin";
 import { checkPassword, hasSession } from "./auth";
 import type { Env } from "./env";
 import { handleMcp } from "./mcp";
+import { clientMetadataUnavailable, fetchOAuth } from "./oauth";
 import { getPage } from "./store";
 import { authorizePage } from "./ui";
 
@@ -40,6 +41,7 @@ async function authorize(c: {
     if (e instanceof AuthorizationError && e.redirectTo) {
       return Response.redirect(e.redirectTo, 302);
     }
+    if (e instanceof CimdFetchError) return clientMetadataUnavailable();
     return new Response("Invalid authorization request", { status: 400 });
   }
 
@@ -86,26 +88,30 @@ app.get("/:slug", async (c) => {
 
 app.notFound((c) => c.text("Not found", 404));
 
+export function oauthOptions(origin: string): OAuthProviderOptions<Env> {
+  return {
+    apiRoute: "/mcp",
+    apiHandler: {
+      fetch: (req, e, c) => handleMcp(req, e, c as ExecutionContext),
+    },
+    defaultHandler: {
+      fetch: (req, e, c) => app.fetch(req, e, c),
+    },
+    authorizeEndpoint: "/authorize",
+    tokenEndpoint: "/token",
+    clientRegistrationEndpoint: "/register",
+    clientIdMetadataDocumentEnabled: true,
+    scopesSupported: ["pages:read", "pages:write"],
+    resourceMetadata: {
+      resource: `${origin}/mcp`,
+      authorization_servers: [origin],
+      resource_name: "Share HTML",
+    },
+  };
+}
+
 export default {
   fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    const origin = new URL(request.url).origin;
-    return new OAuthProvider<Env>({
-      apiRoute: "/mcp",
-      apiHandler: {
-        fetch: (req, _env, c) => handleMcp(req, env, c as ExecutionContext),
-      },
-      defaultHandler: {
-        fetch: (req, e, c) => app.fetch(req, e, c),
-      },
-      authorizeEndpoint: "/authorize",
-      tokenEndpoint: "/token",
-      clientRegistrationEndpoint: "/register",
-      scopesSupported: ["pages:read", "pages:write"],
-      resourceMetadata: {
-        resource: `${origin}/mcp`,
-        authorization_servers: [origin],
-        resource_name: "Share HTML",
-      },
-    }).fetch(request, env, ctx);
+    return fetchOAuth(request, env, ctx, oauthOptions(new URL(request.url).origin));
   },
 };
