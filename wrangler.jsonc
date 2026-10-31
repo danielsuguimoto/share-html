@@ -2,7 +2,7 @@
   "name": "share-html",
   "main": "src/index.ts",
   "compatibility_date": "2026-10-21",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "r2_buckets": [
     {
       "binding": "PAGES_BUCKET",
